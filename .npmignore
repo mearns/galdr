@@ -1,0 +1,10 @@
+echs/
+node_modules/
+.nyc_output/
+.vscode/
+coverage/
+logs/
+out/
+npmpackagejsonlint.config.js
+.editorconfig
+.gitignore

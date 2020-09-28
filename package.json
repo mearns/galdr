@@ -1,0 +1,91 @@
+{
+  "name": "$PROJECT_NAME",
+  "version": "0.1.0",
+  "description": "",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [],
+  "files": [
+    "dist/**"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:mearns/$PROJECT_NAME.git"
+  },
+  "author": "Brian Mearns <mearns.b@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mearns/$PROJECT_NAME/issues"
+  },
+  "homepage": "https://github.com/mearns/$PROJECT_NAME/",
+  "engines": {
+    "node": ">=8 <=13"
+  },
+  "scripts": {
+    "clean": "rimraf dist/ out/ build/ coverage/ .nyc_output/",
+    "pretty": "pretty-quick --staged",
+    "pretty-all": "prettier --write .src/**/*.ts ./test/**/*.js ./test/**/*.ts ./*.json ./*.yaml ./*.yml",
+    "test": "nyc npm run test-only",
+    "test-only": "mocha -r ts-node/register ./test/**/*.spec.*",
+    "verify": "npm run check && npm run test",
+    "check:readme": "remark --no-stdout README.md",
+    "check:code": "eslint ./ test/ --ext .js --ext .ts --format codeframe",
+    "check": "npm run check:code && npm run check:readme",
+    "compile": "tsc",
+    "build": "npm run clean && npm run compile && npm run verify",
+    "docs": "typedoc --out out/docs --mode file --includeVersion --exclude \"+(node_modules|dist|out)/**/*\" --includeDeclarations src",
+    "prepublishOnly": "rimraf node_modules && npm install && npm audit && npm run build && npm run docs"
+  },
+  "nyc": {
+    "instrument": true,
+    "sourceMap": true,
+    "all": true,
+    "include": [
+      "**/*.ts"
+    ],
+    "extension": [
+      ".ts"
+    ],
+    "exclude": [
+      "test/",
+      "**/*.d.ts",
+      "node_modules/",
+      "dist/"
+    ],
+    "require": [
+      "ts-node/register"
+    ],
+    "reporter": [
+      "html",
+      "text"
+    ]
+  },
+  "devDependencies": {
+    "@types/chai": "^4.2.9",
+    "@types/mocha": "^7.0.1",
+    "@types/sinon-chai": "^3.2.3",
+    "@typescript-eslint/eslint-plugin": "^2.21.0",
+    "@typescript-eslint/parser": "^2.21.0",
+    "chai": "^4.2.0",
+    "eslint": "^6.8.0",
+    "eslint-config-prettier": "^6.10.0",
+    "eslint-config-standard": "^14.1.0",
+    "eslint-plugin-import": "^2.20.1",
+    "eslint-plugin-node": "^11.0.0",
+    "eslint-plugin-prettier": "^3.1.2",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.0.1",
+    "mocha": "^7.1.0",
+    "nyc": "^15.0.0",
+    "prettier": "^1.19.1",
+    "pretty-quick": "^2.0.1",
+    "remark-cli": "^7.0.1",
+    "rimraf": "^3.0.2",
+    "sinon": "^9.0.0",
+    "sinon-chai": "^3.5.0",
+    "ts-node": "^8.6.2",
+    "typedoc": "^0.16.10",
+    "typescript": "^3.8.2"
+  },
+  "dependencies": {}
+}

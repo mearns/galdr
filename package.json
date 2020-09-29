@@ -1,5 +1,5 @@
 {
-  "name": "$PROJECT_NAME",
+  "name": "galdr",
   "version": "0.1.0",
   "description": "",
   "main": "dist/index.js",
@@ -10,14 +10,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git@github.com:mearns/$PROJECT_NAME.git"
+    "url": "git@github.com:mearns/galdr.git"
   },
   "author": "Brian Mearns <mearns.b@gmail.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/mearns/$PROJECT_NAME/issues"
+    "url": "https://github.com/mearns/galdr/issues"
   },
-  "homepage": "https://github.com/mearns/$PROJECT_NAME/",
+  "homepage": "https://github.com/mearns/galdr/",
   "engines": {
     "node": ">=8 <=13"
   },
@@ -63,6 +63,7 @@
   "devDependencies": {
     "@types/chai": "^4.2.9",
     "@types/mocha": "^7.0.1",
+    "@types/node": "^14.11.2",
     "@types/sinon-chai": "^3.2.3",
     "@typescript-eslint/eslint-plugin": "^2.21.0",
     "@typescript-eslint/parser": "^2.21.0",
@@ -87,5 +88,7 @@
     "typedoc": "^0.16.10",
     "typescript": "^3.8.2"
   },
-  "dependencies": {}
+  "dependencies": {
+    "stringtree-js": "^0.2.0"
+  }
 }

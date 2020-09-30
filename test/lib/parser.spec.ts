@@ -3,7 +3,7 @@
 /* eslint @typescript-eslint/ban-ts-ignore: 0 */
 
 // Module under test
-import { ArgType, parseCommandLine } from "../../src/lib/parser";
+import { ArgType, parse } from "../../src/lib/parser";
 
 // Support
 import {
@@ -67,7 +67,7 @@ describe("The parser module", () => {
       "pos2",
       "--opt6"
     ];
-    const results = parseCommandLine(testCommand, testCommandLine);
+    const results = parse(testCommand, testCommandLine);
     expect(results).to.deep.equal([
       {
         name: "opt1",
@@ -114,7 +114,7 @@ describe("The parser module", () => {
       }
     } as Command;
 
-    const results = parseCommandLine(testCommand, ["--foobar", "trot"]);
+    const results = parse(testCommand, ["--foobar", "trot"]);
 
     expect(results).to.deep.equal([
       {
@@ -134,7 +134,7 @@ describe("The parser module", () => {
       }
     } as Command;
 
-    const results = parseCommandLine(testCommand, ["--foobar", "trot"]);
+    const results = parse(testCommand, ["--foobar", "trot"]);
 
     expect(results).to.deep.equal([
       {
@@ -158,7 +158,7 @@ describe("The parser module", () => {
       }
     } as Command;
 
-    const results = parseCommandLine(testCommand, ["--foob", "trot"]);
+    const results = parse(testCommand, ["--foob", "trot"]);
 
     expect(results).to.deep.equal([
       {

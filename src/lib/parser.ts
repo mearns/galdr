@@ -1,10 +1,15 @@
-import { Command, CommandOption, OptionType } from "./command-definition";
+import {
+  Command,
+  CommandOption,
+  Option,
+  OptionType
+} from "./command-definition";
 import { StringTree } from "stringtree-js";
 
-type Trie<V> = typeof StringTree & {
-  get(string): V | null;
-  set(string, V): void;
-  prefix(string): Record<string, V>;
+type Trie<V> = {
+  get(prefix: string): V | null;
+  set(prefix: string, value: V): void;
+  prefix(prefix: string): Record<string, V>;
 };
 
 /**
@@ -20,7 +25,7 @@ export enum ArgType {
 /**
  * The base type of all parsed arguments.
  */
-export interface Arg<T extends ArgType> {
+export interface Arg<T extends ArgType = ArgType> {
   readonly type: T;
   readonly name?: string;
   readonly value?: string | boolean;
@@ -60,9 +65,14 @@ function isFlagTypeOption(opt: CommandOption): boolean {
   return opt.type === OptionType.flag || opt.type === OptionType.count;
 }
 
+interface NamedOption extends CommandOption {
+  name: string;
+}
+
 interface ParserState {
-  longOptions: Trie<CommandOption>;
-  shortOptions: Map<string, CommandOption>;
+  knownOptionNames: Set<string>;
+  longOptions: Trie<NamedOption>;
+  shortOptions: Map<string, NamedOption>;
   topCommand: Command;
   parsed: Array<Arg<ArgType>>;
 }
@@ -85,12 +95,14 @@ function addKnownOptionToState(
   opt: CommandOption
 ): void {
   const aliases = [name, ...(opt.aliases || [])];
+  const namedOpt: NamedOption = { name, ...opt };
+  state.knownOptionNames.add(name);
   if (isFlagTypeOption(opt)) {
     aliases.push(...aliases.filter(a => a.length > 1).map(a => `no-${a}`));
   }
   for (const alias of aliases) {
     if (alias.length === 1) {
-      state.shortOptions.set(alias, opt);
+      state.shortOptions.set(alias, namedOpt);
     } else {
       if (state.longOptions.get(alias)) {
         if (state.longOptions.get(alias).type !== opt.type) {
@@ -101,7 +113,7 @@ function addKnownOptionToState(
           );
         }
       }
-      state.longOptions.set(alias, opt);
+      state.longOptions.set(alias, namedOpt);
     }
   }
 }
@@ -124,10 +136,16 @@ interface ParserContext {
   hasNext: () => boolean;
   next: () => [string, ParserApi];
   getResults: () => Array<Arg<ArgType>>;
+  getAllOptionNames: () => Array<string>;
+  getOption: (opt: string) => NamedOption;
+  getShortOption: (opt: string) => NamedOption;
+  getLongOption: (opt: string) => NamedOption;
+  getTopCommand: () => Command;
 }
 
 function createParserContext(cmd: Command, args: Array<string>): ParserContext {
   const state: ParserState = {
+    knownOptionNames: new Set(),
     longOptions: new StringTree(),
     shortOptions: new Map(),
     topCommand: cmd,
@@ -161,6 +179,7 @@ function createParserContext(cmd: Command, args: Array<string>): ParserContext {
     });
     state.topCommand = state.topCommand.subCommands[name];
   };
+  const getTopCommand = () => state.topCommand;
   const positional = (value: string): void => {
     pushParsed({
       type: ArgType.positional,
@@ -181,16 +200,23 @@ function createParserContext(cmd: Command, args: Array<string>): ParserContext {
       value: !name.startsWith("no-")
     });
   };
-  const getLongOption = (opt: string): CommandOption =>
+  const getLongOption = (opt: string): NamedOption =>
     state.longOptions.get(opt);
-  const getShortOption = (opt: string): CommandOption =>
+  const getShortOption = (opt: string): NamedOption =>
     state.shortOptions.get(opt);
+  const getAllOptionNames = (): Array<string> => [...state.knownOptionNames];
   const hasSubCommand = (name: string): boolean =>
     hasOwnProperty(state.topCommand.subCommands || {}, name);
 
   return {
     getResults: (): Array<Arg<ArgType>> => state.parsed,
+    getTopCommand,
     hasNext,
+    getAllOptionNames,
+    getOption: (name: string): NamedOption =>
+      name.length === 1 ? getShortOption(name) : getLongOption(name),
+    getShortOption,
+    getLongOption,
     next: (): [string, ParserApi] => {
       const argIdx = idx;
       const arg = getNext();
@@ -215,13 +241,123 @@ function createParserContext(cmd: Command, args: Array<string>): ParserContext {
   };
 }
 
-export function parse(cmd: Command, args: string[]): Array<Arg<ArgType>> {
+export function parseResults(cmd: Command, args: string[]): ParserContext {
   const context = createParserContext(cmd, args);
   while (context.hasNext()) {
     const [arg, api] = context.next();
     parseArg(arg, api);
   }
-  return context.getResults();
+  return context;
+}
+
+export function parse(cmd: Command, args: string[]): Array<Arg<ArgType>> {
+  return parseResults(cmd, args).getResults();
+}
+
+interface CompletionSuggestions {
+  words: Array<string>;
+  files: boolean;
+}
+
+function isOptionArg(arg: Arg): arg is OptionArg {
+  return (
+    arg.type === ArgType.option &&
+    hasOwnProperty(arg, "name") &&
+    hasOwnProperty(arg, "value")
+  );
+}
+
+export function getCompletionSuggestions(
+  cmd: Command,
+  args: Array<string>
+): CompletionSuggestions {
+  // From the "complete" command, if there's a space after the last arg typed, then
+  // there's an extra empty-string arg passed at the end of the array. Otherwise, the
+  // last element is the one that they're still typing.
+  const context = parseResults(cmd, args.slice(1));
+  const optionsNotUsed: Array<string> = getOptionsNotUsed(context);
+
+  const topCommand: Command = context.getTopCommand();
+  const commands: Array<string> = Object.keys(
+    (topCommand && topCommand.subCommands) || {}
+  );
+
+  const expectedParamType: OptionType = getExpectedParameterType(args, context);
+  // XXX: Look through positionals not yet consumed, and an option at end (if any) to see if they are type file or files.
+  // const lookingForFiles =
+
+  return {
+    words: [...optionsNotUsed, ...commands],
+    files: lookingForFiles
+  };
+}
+
+/**
+ * Return the type of parameter expected next, or null if no parameter is expected.
+ * A parameter is expected if the last arg is complete and represents an option that
+ * takes a parameter.
+ */
+function getExpectedParameterType(
+  args: Array<string>,
+  context: ParserContext
+): OptionType | null {
+  const results: Array<Arg<ArgType>> = context.getResults();
+
+  if (args[args.length - 1] !== "") {
+    // Last arg isn't complete.
+    return null;
+  }
+  const lastParsed: Arg = results[results.length - 1];
+  if (!isOptionArg(lastParsed)) {
+    // Last arg isn't an option
+    return null;
+  }
+  const tailOptArg: OptionArg = lastParsed;
+  const tailOpt: CommandOption = context.getOption(tailOptArg.name);
+
+  if (isFlagTypeOption(tailOpt)) {
+    // Flag types don't take params
+    return null;
+  }
+
+  return tailOpt.type;
+}
+
+function getPositionalsNotUsed(context: ParserContext): void {
+  // XXX
+}
+
+function getOptionsNotUsed(context: ParserContext): Array<string> {
+  const parsed = context.getResults();
+  const optionArgsPassed: Set<OptionArg> = new Set([
+    ...parsed.filter(arg => arg.type === ArgType.option)
+  ] as Array<OptionArg>);
+  const optionsPassed: Array<NamedOption> = [...optionArgsPassed]
+    .map(arg => arg.name)
+    .map(name =>
+      name.length === 1
+        ? context.getShortOption(name)
+        : context.getLongOption(name)
+    );
+  const optionNamesConsumed: Set<string> = new Set([
+    ...optionsPassed.filter(isSingularOpt).map(opt => opt.name)
+  ]);
+  return context
+    .getAllOptionNames()
+    .filter(optName => !optionNamesConsumed.has(optName));
+}
+
+function isSingularOpt(cmd: CommandOption): boolean {
+  switch (cmd.type) {
+    case OptionType.dirs:
+    case OptionType.files:
+    case OptionType.numbers:
+    case OptionType.strings:
+      return false;
+
+    default:
+      return true;
+  }
 }
 
 function parseArg(arg: string, api: ParserApi): void {
